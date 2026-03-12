@@ -1480,11 +1480,11 @@ if (partnerPersonas && partnerPersonas.length > 0 && Math.random() < 0.3) {
                     const replyPool = customReplies.filter(r => !disabledItems.has(r) && !disabledGroupItems.has(r));
                     const replyText = replyPool[Math.floor(Math.random() * replyPool.length)];
 
-                    const shouldSendSticker = stickerLibrary && stickerLibrary.length > 0 && Math.random() < 0.3;
+                    const shouldSendSticker = stickerLibrary && stickerLibrary.length > 0 && Math.random() < 0.2;
 
                     let finalText = replyText;
                     let separateEmoji = null;
-                    if (customEmojis && customEmojis.length > 0 && Math.random() < 0.3) {
+                    if (customEmojis && customEmojis.length > 0 && Math.random() < 0.2) {
                         const emoji = customEmojis[Math.floor(Math.random() * customEmojis.length)];
                         if (settings.emojiMixEnabled !== false) {
                             finalText = Math.random() < 0.5

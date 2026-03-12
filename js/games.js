@@ -1425,13 +1425,35 @@ function initComboMenu() {
             .toLowerCase();
         var words = {};
         var cn = text.replace(/[a-z ]/g, '');
-        for (var i = 0; i < cn.length; i++) {
-            for (var l = 2; l <= 4 && i + l <= cn.length; l++) {
-                var w = cn.slice(i, i + l);
-                if (!STOP_WORDS.has(w))
-                    words[w] = (words[w] || 0) + (l === 2 ? 1 : l === 3 ? 1.8 : 2.4);
+        // 使用非重叠分词：优先提取长词，避免"我想你"同时产生"我想"和"想你"
+        // 策略：对每个起点只取一次最长匹配（4>3>2），跳过已覆盖字符
+        var covered = new Array(cn.length).fill(false);
+        // 先扫一遍提取4字词
+        for (var i = 0; i + 4 <= cn.length; i++) {
+            var w4 = cn.slice(i, i + 4);
+            if (!STOP_WORDS.has(w4)) {
+                words[w4] = (words[w4] || 0) + 2.4;
+                covered[i] = covered[i+1] = covered[i+2] = covered[i+3] = true;
+                i += 3; // 跳过已覆盖字符
             }
         }
+        // 再扫3字词（跳过已覆盖位置）
+        covered = new Array(cn.length).fill(false); // 重置，用于3字
+        for (var j = 0; j + 3 <= cn.length; j++) {
+            var w3 = cn.slice(j, j + 3);
+            if (!STOP_WORDS.has(w3)) {
+                words[w3] = (words[w3] || 0) + 1.8;
+                j += 2;
+            }
+        }
+        // 2字词：步长2，非重叠，不与已有词重复计数
+        for (var k = 0; k + 2 <= cn.length; k += 2) {
+            var w2 = cn.slice(k, k + 2);
+            if (!STOP_WORDS.has(w2)) {
+                words[w2] = (words[w2] || 0) + 1;
+            }
+        }
+        // 英文单词（长度≥3）
         (text.match(/[a-z]{3,}/g) || []).forEach(function(w) {
             if (!STOP_WORDS.has(w)) words[w] = (words[w] || 0) + 1;
         });
