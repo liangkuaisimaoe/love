@@ -113,25 +113,132 @@ function deduplicateContentArray(arr, baseSystemArray = []) {
         const playSound = (type) => {
             if (!settings.soundEnabled) return;
             try {
-                if (settings.customSoundUrl && settings.customSoundUrl.trim()) {
-                    const audio = new Audio(settings.customSoundUrl.trim());
+                // =============== 两方音效配置 ===============
+                const category = (() => {
+                    // 新类型（按两方区分）
+                    if (type === 'my_send') return 'my_send';
+                    if (type === 'partner_message') return 'partner_message';
+                    if (type === 'my_poke') return 'my_poke';
+                    if (type === 'partner_poke') return 'partner_poke';
+                    // 兼容旧调用
+                    if (type === 'send') return 'my_send';
+                    if (type === 'message') return 'partner_message';
+                    if (type === 'poke') return 'my_poke';
+                    return null;
+                })();
+
+                const customUrlByCategory = (() => {
+                    if (!category) return '';
+                    if (category === 'my_send') return settings.mySendCustomSoundUrl || '';
+                    if (category === 'partner_message') return settings.partnerMessageCustomSoundUrl || '';
+                    if (category === 'my_poke') return settings.myPokeCustomSoundUrl || '';
+                    if (category === 'partner_poke') return settings.partnerPokeCustomSoundUrl || '';
+                    return '';
+                })();
+
+                const legacyCustomUrl = (settings.customSoundUrl || '').trim();
+                const resolvedCustomUrl = (customUrlByCategory && customUrlByCategory.trim())
+                    ? customUrlByCategory.trim()
+                    : legacyCustomUrl;
+
+                // 自定义 URL：只要填了就直接播放（不区分内置/预设）
+                if (resolvedCustomUrl) {
+                    const audio = new Audio(resolvedCustomUrl);
                     audio.volume = Math.min(1, Math.max(0, settings.soundVolume || 0.15));
                     audio.play().catch(() => {});
                     return;
                 }
+
+                // =============== 内置合成音效（两方 + 预设） ===============
+                const CATEGORY_BASE = {
+                    my_send: { osc1Type: 'sine', osc2Type: 'triangle', freq: 820, dur: 0.16, up: 1.08, down: 0.65 },
+                    partner_message: { osc1Type: 'sine', osc2Type: 'triangle', freq: 620, dur: 0.17, up: 1.05, down: 0.62 },
+                    my_poke: { osc1Type: 'triangle', osc2Type: 'sine', freq: 540, dur: 0.14, up: 1.18, down: 0.68 },
+                    partner_poke: { osc1Type: 'triangle', osc2Type: 'sine', freq: 540, dur: 0.14, up: 1.18, down: 0.68 }
+                };
+
+                const PRESET_EFFECTS = {
+                    // 预设 effect：允许覆盖波形与倍率（不填则沿用基础音色）
+                    tone_default: { osc1Type: null, osc2Type: null, fMul: 1, durMul: 1, upMul: 1, downMul: 1 },
+                    tone_soft: { osc1Type: 'sine', osc2Type: 'sine', fMul: 0.98, durMul: 1.1, upMul: 0.98, downMul: 0.98 },
+                    tone_bright: { osc1Type: 'triangle', osc2Type: 'triangle', fMul: 1.08, durMul: 0.9, upMul: 1.05, downMul: 0.97 },
+                    tone_deep: { osc1Type: 'sawtooth', osc2Type: 'triangle', fMul: 0.85, durMul: 1.2, upMul: 1.0, downMul: 0.9 },
+                    tone_mystic: { osc1Type: 'square', osc2Type: 'sine', fMul: 0.98, durMul: 1.0, upMul: 1.02, downMul: 1.0 },
+                    tone_sparkle: { osc1Type: 'sawtooth', osc2Type: 'triangle', fMul: 1.15, durMul: 0.8, upMul: 1.15, downMul: 1.05 }
+                };
+
+                const presetId = (() => {
+                    if (!category) return '';
+                    if (category === 'my_send') return settings.mySendSoundPreset || 'tone_default';
+                    if (category === 'partner_message') return settings.partnerMessageSoundPreset || 'tone_default';
+                    if (category === 'my_poke') return settings.myPokeSoundPreset || 'tone_default';
+                    if (category === 'partner_poke') return settings.partnerPokeSoundPreset || 'tone_default';
+                    return 'tone_default';
+                })();
+
+                const cfg = (() => {
+                    if (category && CATEGORY_BASE[category]) {
+                        const base = CATEGORY_BASE[category];
+                        const fx = PRESET_EFFECTS[presetId] || PRESET_EFFECTS.tone_default;
+                        const osc1Type = (typeof fx.osc1Type === 'string') ? fx.osc1Type : base.osc1Type;
+                        const osc2Type = (typeof fx.osc2Type === 'string') ? fx.osc2Type : base.osc2Type;
+                        const freq = base.freq * (fx.fMul || 1);
+                        const dur = base.dur * (fx.durMul || 1);
+                        const up = base.up * (fx.upMul || 1);
+                        const down = base.down * (fx.downMul || 1);
+                        return { osc1Type, osc2Type, freq, dur, up, down };
+                    }
+
+                    // 兼容其它旧声音类型（不走两方预设）
+                    if (type === 'favorite') return { osc1Type: 'sine', osc2Type: 'sine', freq: 1200, dur: 0.18, up: 1.06, down: 0.70 };
+                    if (type === 'anniversary') return { osc1Type: 'sawtooth', osc2Type: 'triangle', freq: 660, dur: 0.22, up: 1.10, down: 0.62 };
+                    if (type === 'mood') return { osc1Type: 'sine', osc2Type: 'square', freq: 440, dur: 0.16, up: 1.12, down: 0.60 };
+                    if (type === 'import') return { osc1Type: 'square', osc2Type: 'triangle', freq: 330, dur: 0.16, up: 1.25, down: 0.70 };
+                    if (type === 'export') return { osc1Type: 'triangle', osc2Type: 'sine', freq: 520, dur: 0.16, up: 1.15, down: 0.66 };
+                    if (type === 'error') return { osc1Type: 'sawtooth', osc2Type: 'square', freq: 180, dur: 0.14, up: 1.03, down: 0.42 };
+                    return { osc1Type: 'sine', osc2Type: 'triangle', freq: 600, dur: 0.15, up: 1.05, down: 0.60 };
+                })();
+
                 const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                const oscillator = audioContext.createOscillator();
                 const gainNode = audioContext.createGain();
-                oscillator.connect(gainNode); gainNode.connect(audioContext.destination);
-                oscillator.type = 'sine';
-                const vol = Math.min(0.5, Math.max(0.01, settings.soundVolume || 0.1));
-                gainNode.gain.setValueAtTime(vol, audioContext.currentTime);
-                if (type === 'send') oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
-                else if (type === 'favorite') oscillator.frequency.setValueAtTime(1200, audioContext.currentTime);
-                else oscillator.frequency.setValueAtTime(600, audioContext.currentTime);
-                oscillator.start();
-                gainNode.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.15);
-                oscillator.stop(audioContext.currentTime + 0.15);
+                const vol = Math.min(0.55, Math.max(0.01, settings.soundVolume || 0.1));
+
+                // 叠加一层泛音让音色更“厚”
+                const osc1 = audioContext.createOscillator();
+                const osc2 = audioContext.createOscillator();
+
+                osc1.connect(gainNode);
+                osc2.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                const now = audioContext.currentTime;
+                gainNode.gain.setValueAtTime(vol, now);
+
+                const jitter = (Math.random() - 0.5) * 0.02; // 轻微随机
+                const f1 = cfg.freq * (1 + jitter);
+                const f2 = f1 * 2;
+
+                osc1.type = cfg.osc1Type;
+                osc2.type = cfg.osc2Type;
+
+                osc1.frequency.setValueAtTime(f1, now);
+                osc2.frequency.setValueAtTime(f2, now);
+
+                // 频率滑动 + 音量包络
+                osc1.frequency.exponentialRampToValueAtTime(f1 * cfg.up, now + 0.04);
+                osc2.frequency.exponentialRampToValueAtTime(f2 * (cfg.up - 0.03), now + 0.04);
+
+                osc1.frequency.exponentialRampToValueAtTime(f1 * cfg.down, now + cfg.dur);
+                osc2.frequency.exponentialRampToValueAtTime(f2 * cfg.down, now + cfg.dur);
+
+                const end = now + cfg.dur;
+                osc1.start(now);
+                osc2.start(now);
+
+                gainNode.gain.exponentialRampToValueAtTime(0.0001, end);
+
+                osc1.stop(end);
+                osc2.stop(end);
             } catch (e) { console.warn("音频播放失败:", e); }
         };
 
@@ -261,19 +368,115 @@ async function importAllData(file) {
                 if (typeof importChatHistory === 'function') importChatHistory(file);
                 return;
             }
-            if (!confirm('全量恢复将覆盖所有现有数据，确认继续？')) return;
+            const categories = [
+                {
+                    id: 'chat',
+                    label: '聊天记录/会话',
+                    indexedDBNeedles: ['chatMessages', 'sessionList', 'chatSettings'],
+                    localStorageNeedles: []
+                },
+                {
+                    id: 'replies',
+                    label: '回复/拍一拍/氛围',
+                    indexedDBNeedles: ['customReplies', 'customPokes', 'customStatuses', 'customMottos', 'customIntros', 'customEmojis', 'customReplyGroups'],
+                    localStorageNeedles: ['disabledReplyItems', 'pokeSym_my', 'pokeSym_partner', 'pokeSym_my_custom', 'pokeSym_partner_custom']
+                },
+                {
+                    id: 'stickers',
+                    label: '表情库(贴纸)',
+                    indexedDBNeedles: ['stickerLibrary'],
+                    localStorageNeedles: ['disabledStickerItems']
+                },
+                {
+                    id: 'ann',
+                    label: '纪念日',
+                    indexedDBNeedles: ['anniversaries'],
+                    localStorageNeedles: []
+                },
+                {
+                    id: 'mood',
+                    label: '心晴手账',
+                    indexedDBNeedles: ['moodCalendar', 'customMoodOptions', 'moodTrash'],
+                    localStorageNeedles: []
+                },
+                {
+                    id: 'themes',
+                    label: '主题与外观',
+                    indexedDBNeedles: ['customThemes', 'themeSchemes', 'backgroundGallery', 'chatBackground', 'partnerAvatar', 'myAvatar', 'partnerPersonas'],
+                    localStorageNeedles: []
+                }
+            ];
+
+            const pickSelected = () => new Promise((resolve) => {
+                const overlay = document.createElement('div');
+                overlay.style.cssText = `
+                    position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,0.6);
+                    backdrop-filter:blur(10px);display:flex;align-items:flex-end;justify-content:center;
+                `;
+                overlay.innerHTML = `
+                    <div style="
+                        width:100%;max-width:560px;background:var(--secondary-bg);border-radius:24px 24px 0 0;
+                        box-shadow:0 -10px 60px rgba(0,0,0,0.3);
+                        padding:16px 18px env(safe-area-inset-bottom,0);
+                    ">
+                        <div style="width:36px;height:4px;border-radius:2px;background:var(--border-color);margin:0 auto 14px;"></div>
+                        <div style="font-size:16px;font-weight:800;color:var(--text-primary);margin-bottom:10px;">全量恢复：选择要导入的部分</div>
+                        <div style="display:flex;flex-direction:column;gap:10px;max-height:60vh;overflow:auto;padding-right:6px;">
+                            ${categories.map(c => {
+                                return `
+                                    <label style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 12px;border:1.5px solid var(--border-color);border-radius:16px;background:var(--primary-bg);">
+                                        <span style="font-size:13px;font-weight:700;color:var(--text-primary);">${c.label}</span>
+                                        <input type="checkbox" data-cat="${c.id}" checked style="transform:scale(1.1);accent-color:var(--accent-color);">
+                                    </label>
+                                `;
+                            }).join('')}
+                        </div>
+                        <div style="display:flex;gap:10px;margin-top:14px;">
+                            <button id="full-imp-cancel" class="modal-btn modal-btn-secondary" style="flex:1;padding:12px 0;">取消</button>
+                            <button id="full-imp-confirm" class="modal-btn modal-btn-primary" style="flex:1;padding:12px 0;">确认恢复</button>
+                        </div>
+                    </div>
+                `;
+                overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); resolve(null); });
+                document.getElementById('full-imp-cancel').onclick = () => { overlay.remove(); resolve(null); };
+                document.getElementById('full-imp-confirm').onclick = () => {
+                    const selected = Array.from(overlay.querySelectorAll('input[type=checkbox]:checked'))
+                        .map(i => i.dataset.cat);
+                    overlay.remove();
+                    resolve(selected);
+                };
+                document.body.appendChild(overlay);
+            });
+
+            const selectedCats = await pickSelected();
+            if (!selectedCats || selectedCats.length === 0) return;
+
+            const matchAnyNeedles = (key, needles) => needles.some(n => key && key.includes(n));
+
             showNotification('正在恢复数据…', 'info', 3000);
+
+            const indexedDB = data.indexedDB || {};
+            const localStorageData = data.localStorage || {};
+
+            const selectedCategories = categories.filter(c => selectedCats.includes(c.id));
+
             if (data.indexedDB) {
-                for (const [k, v] of Object.entries(data.indexedDB)) {
-                    try { await localforage.setItem(k, v); } catch(err) {}
+                for (const [k, v] of Object.entries(indexedDB)) {
+                    const ok = selectedCategories.some(c => matchAnyNeedles(k, c.indexedDBNeedles));
+                    if (!ok) continue;
+                    try { await localforage.setItem(k, v); } catch (err) {}
                 }
             }
+
             if (data.localStorage) {
-                for (const [k, v] of Object.entries(data.localStorage)) {
-                    try { localStorage.setItem(k, v); } catch(err) {}
+                for (const [k, v] of Object.entries(localStorageData)) {
+                    const ok = selectedCategories.some(c => matchAnyNeedles(k, c.localStorageNeedles));
+                    if (!ok) continue;
+                    try { localStorage.setItem(k, v); } catch (err) {}
                 }
             }
-            showNotification('恢复成功，即将刷新页面…', 'success', 2000);
+
+            showNotification('恢复完成，即将刷新页面…', 'success', 2000);
             setTimeout(() => location.reload(), 2200);
         } catch(e) {
             console.error('全量导入失败:', e);
