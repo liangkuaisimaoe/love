@@ -554,6 +554,9 @@ const saveData = async () => {
     }
 
     _backupCriticalData();
+    if (typeof window.markLocalBackupUpdated === 'function') {
+        window.markLocalBackupUpdated('local-save');
+    }
 };
 
         function initializeRandomUI() {

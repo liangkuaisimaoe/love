@@ -53,6 +53,32 @@
         +     '<button id="import-chat-btn"></button>'
         +   '</div>'
 
+        +   '<div class="dm-section-label"><i class="fas fa-cloud"></i> 云同步 / Supabase</div>'
+        +   '<div class="dm-row-card">'
+        +     '<div class="dm-row-item" id="dm-supabase-guide-row" style="cursor:pointer">'
+        +       '<div class="dm-row-icon" style="background:rgba(62,207,142,0.14)"><i class="fas fa-cloud" style="color:#3ECF8E"></i></div>'
+        +       '<div class="dm-row-info">'
+        +         '<div class="dm-row-title">云端备份同步</div>'
+        +         '<div class="dm-row-desc" id="dm-supabase-status-text">未连接 Supabase（点击配置）</div>'
+        +       '</div>'
+        +       '<button class="dm-nav-btn" id="dm-supabase-guide-btn"><i class="fas fa-chevron-right"></i></button>'
+        +     '</div>'
+        +     '<div class="dm-row-item">'
+        +       '<div class="dm-row-icon" style="background:rgba(72,138,255,0.12)"><i class="fas fa-laptop" style="color:#488AFF"></i></div>'
+        +       '<div class="dm-row-info"><div class="dm-row-title">本地更新时间</div><div class="dm-row-desc" id="dm-local-backup-time">暂无</div></div>'
+        +     '</div>'
+        +     '<div class="dm-row-item">'
+        +       '<div class="dm-row-icon" style="background:rgba(62,207,142,0.12)"><i class="fas fa-server" style="color:#3ECF8E"></i></div>'
+        +       '<div class="dm-row-info"><div class="dm-row-title">云端更新时间</div><div class="dm-row-desc" id="dm-cloud-backup-time">暂无</div></div>'
+        +     '</div>'
+        +     '<div class="dm-row-item" style="padding: 12px 16px;">'
+        +       '<div class="dm-row-item-action-group" style="width: 100%; display: flex; gap: 10px;">'
+        +         '<button class="dm-nav-btn" id="dm-supabase-check-btn" onclick="window.checkSupabaseCloud()" style="width:auto; flex:1; padding: 10px; border-radius: 12px;"><i class="fas fa-rotate"></i><span style="margin-left:6px;">检查云端</span></button>'
+        +         '<button class="dm-nav-btn" id="dm-supabase-sync-btn" onclick="window.syncSupabaseCloud()" style="width:auto; flex:1; padding: 10px; border-radius: 12px; background:var(--accent-color); color:#fff;"><i class="fas fa-cloud-arrow-up"></i><span style="margin-left:6px;">同步数据</span></button>'
+        +       '</div>'
+        +     '</div>'
+        +   '</div>'
+
         +   '<div class="dm-section-label"><i class="fas fa-bell"></i> 通知与关于</div>'
         +   '<div class="dm-row-card">'
         +     '<div class="dm-row-item">'
@@ -387,6 +413,25 @@
             inp.click();
         });
 
+        var supabaseGuideRow = mc.querySelector('#dm-supabase-guide-row');
+        var supabaseGuideBtn = mc.querySelector('#dm-supabase-guide-btn');
+        var supabaseCheckBtn = mc.querySelector('#dm-supabase-check-btn');
+        var supabaseSyncBtn = mc.querySelector('#dm-supabase-sync-btn');
+
+        if (supabaseGuideRow) supabaseGuideRow.addEventListener('click', function () {
+            if (typeof openSupabaseGuide === 'function') openSupabaseGuide(false);
+        });
+        if (supabaseGuideBtn) supabaseGuideBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            if (typeof openSupabaseGuide === 'function') openSupabaseGuide(true);
+        });
+        if (supabaseCheckBtn) supabaseCheckBtn.addEventListener('click', function () {
+            if (typeof checkSupabaseCloud === 'function') checkSupabaseCloud();
+        });
+        if (supabaseSyncBtn) supabaseSyncBtn.addEventListener('click', function () {
+            if (typeof syncSupabaseCloud === 'function') syncSupabaseCloud();
+        });
+
         var creditsBtn = mc.querySelector('#open-credits-btn');
         if (creditsBtn) creditsBtn.addEventListener('click', function () {
             var dataModal = document.getElementById('data-modal');
@@ -418,6 +463,7 @@
         setTimeout(function () {
             updateStats();
             syncToggles();
+            if (typeof refreshCloudSyncInfo === 'function') refreshCloudSyncInfo();
         }, 60);
     }
 
