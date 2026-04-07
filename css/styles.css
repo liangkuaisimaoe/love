@@ -10047,7 +10047,7 @@
             background: var(--secondary-bg);
             border: 1px solid var(--border-color);
             border-radius: 18px;
-            overflow: hidden;
+            /* overflow: hidden; */
         }
         .dm-row-item {
             display: flex;
